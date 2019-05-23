@@ -17,6 +17,7 @@ limitations under the License.
 package utils
 
 import (
+
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
@@ -26,6 +27,8 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
+	"github.com/tjfoc/gmsm/sm2"
+
 )
 
 // struct to hold info required for PKCS#8
@@ -183,26 +186,28 @@ func PrivateKeyToEncryptedPEM(privateKey interface{}, pwd []byte) ([]byte, error
 }
 
 // DERToPrivateKey unmarshals a der to private key
+// here we change ecdsa to SM2 way
 func DERToPrivateKey(der []byte) (key interface{}, err error) {
-
+    //PKCS1 is rsa and we leave it alone
 	if key, err = x509.ParsePKCS1PrivateKey(der); err == nil {
 		return key, nil
 	}
 
-	if key, err = x509.ParsePKCS8PrivateKey(der); err == nil {
+	if key, err = sm2.ParsePKCS8UnecryptedPrivateKey(der); err == nil {
 		switch key.(type) {
-		case *rsa.PrivateKey, *ecdsa.PrivateKey:
+		//case *rsa.PrivateKey, *ecdsa.PrivateKey: //ecdsa way
+		case *sm2.PrivateKey:  // SM2 way
 			return
 		default:
 			return nil, errors.New("Found unknown private key type in PKCS#8 wrapping")
 		}
 	}
-
+    // this is ASN.1 and we do not change this
 	if key, err = x509.ParseECPrivateKey(der); err == nil {
 		return
 	}
-
-	return nil, errors.New("Invalid key type. The DER must contain an rsa.PrivateKey or ecdsa.PrivateKey")
+	return nil, errors.New("Invalid key type. The DER must contain an rsa.PrivateKey or sm2.PrivateKey")
+	//return nil, errors.New("Invalid key type. The DER must contain an rsa.PrivateKey or ecdsa.PrivateKey")//
 }
 
 // PEMtoPrivateKey unmarshals a pem to private key
@@ -448,12 +453,12 @@ func PEMtoPublicKey(raw []byte, pwd []byte) (interface{}, error) {
 }
 
 // DERToPublicKey unmarshals a der to public key
+//here we use SM2 way to do it instead of ecdsa way, der means x509 cert
 func DERToPublicKey(raw []byte) (pub interface{}, err error) {
 	if len(raw) == 0 {
 		return nil, errors.New("Invalid DER. It must be different from nil.")
 	}
-
-	key, err := x509.ParsePKIXPublicKey(raw)
-
+    key ,err := sm2.ParsePKIXPublicKey(raw)
+	//key, err := x509.ParsePKIXPublicKey(raw)// ecdsa way
 	return key, err
 }

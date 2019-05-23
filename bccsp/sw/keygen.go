@@ -17,26 +17,33 @@ limitations under the License.
 package sw
 
 import (
-	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/rsa"
 	"fmt"
-
 	"github.com/hyperledger/fabric/bccsp"
+	"github.com/tjfoc/gmsm/sm2"
 )
 
 type ecdsaKeyGenerator struct {
-	curve elliptic.Curve
+	curve elliptic.Curve   //we do not need it anymore  but the fabric will init it in the beginning so we still keep it
 }
 
 func (kg *ecdsaKeyGenerator) KeyGen(opts bccsp.KeyGenOpts) (bccsp.Key, error) {
-	privKey, err := ecdsa.GenerateKey(kg.curve, rand.Reader)
+	//this is sm2 way
+	privKey, err:= sm2.GenerateKey()
+	if err != nil {
+		return nil, fmt.Errorf("Failed generating sm2 key for [%s]", err)
+	}
+	return &ecdsaPrivateKey{privKey}, nil
+
+	// below is ecdsa way
+	/*privKey, err := ecdsa.GenerateKey(kg.curve, rand.Reader)
 	if err != nil {
 		return nil, fmt.Errorf("Failed generating ECDSA key for [%v]: [%s]", kg.curve, err)
 	}
 
-	return &ecdsaPrivateKey{privKey}, nil
+	return &ecdsaPrivateKey{privKey}, nil*/
 }
 
 type aesKeyGenerator struct {

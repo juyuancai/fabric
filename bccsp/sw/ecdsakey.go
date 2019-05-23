@@ -13,21 +13,25 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
+
+//Juyuan Cai: has changed to guomi sm2 without changing the ecdsa function names
+
 package sw
 
 import (
-	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/sha256"
 	"crypto/x509"
 	"errors"
 	"fmt"
-
 	"github.com/hyperledger/fabric/bccsp"
+	"github.com/tjfoc/gmsm/sm2"
 )
 
+
+
 type ecdsaPrivateKey struct {
-	privKey *ecdsa.PrivateKey
+	privKey *sm2.PrivateKey   //change ecdsa to sm2
 }
 
 // Bytes converts this key to its byte representation,
@@ -70,7 +74,7 @@ func (k *ecdsaPrivateKey) PublicKey() (bccsp.Key, error) {
 }
 
 type ecdsaPublicKey struct {
-	pubKey *ecdsa.PublicKey
+	pubKey *sm2.PublicKey       //change ecdsa to sm2
 }
 
 // Bytes converts this key to its byte representation,

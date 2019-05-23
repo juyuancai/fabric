@@ -13,19 +13,18 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
+//Juyuan Cai: has changed to guomi sm2 without changing the ecdsa function names
+
 package sw
 
 import (
-	"crypto/ecdsa"
 	"crypto/rand"
-	"fmt"
-
 	"github.com/hyperledger/fabric/bccsp"
-	"github.com/hyperledger/fabric/bccsp/utils"
 )
+// no use any more
+/*func signECDSA(k *sm2.PrivateKey, digest []byte, opts bccsp.SignerOpts) ([]byte, error) {
 
-func signECDSA(k *ecdsa.PrivateKey, digest []byte, opts bccsp.SignerOpts) ([]byte, error) {
-	r, s, err := ecdsa.Sign(rand.Reader, k, digest)
+	r, s, err := ecdsa.Sign(rand.Reader, k, digest)// ecdsa way
 	if err != nil {
 		return nil, err
 	}
@@ -36,9 +35,10 @@ func signECDSA(k *ecdsa.PrivateKey, digest []byte, opts bccsp.SignerOpts) ([]byt
 	}
 
 	return utils.MarshalECDSASignature(r, s)
-}
+}*/
 
-func verifyECDSA(k *ecdsa.PublicKey, signature, digest []byte, opts bccsp.SignerOpts) (bool, error) {
+// no use any more
+/*func verifyECDSA(k *ecdsa.PublicKey, signature, digest []byte, opts bccsp.SignerOpts) (bool, error) {
 	r, s, err := utils.UnmarshalECDSASignature(signature)
 	if err != nil {
 		return false, fmt.Errorf("Failed unmashalling signature [%s]", err)
@@ -54,22 +54,27 @@ func verifyECDSA(k *ecdsa.PublicKey, signature, digest []byte, opts bccsp.Signer
 	}
 
 	return ecdsa.Verify(k, digest, r, s), nil
-}
+}*/
 
 type ecdsaSigner struct{}
 
 func (s *ecdsaSigner) Sign(k bccsp.Key, digest []byte, opts bccsp.SignerOpts) ([]byte, error) {
-	return signECDSA(k.(*ecdsaPrivateKey).privKey, digest, opts)
+	//return signECDSA(k.(*ecdsaPrivateKey).privKey, digest, opts)  //ecdsa way
+	return k.(*ecdsaPrivateKey).privKey.Sign(rand.Reader,digest,opts)  //sm2 way
+
 }
 
 type ecdsaPrivateKeyVerifier struct{}
 
 func (v *ecdsaPrivateKeyVerifier) Verify(k bccsp.Key, signature, digest []byte, opts bccsp.SignerOpts) (bool, error) {
-	return verifyECDSA(&(k.(*ecdsaPrivateKey).privKey.PublicKey), signature, digest, opts)
+	return k.(*ecdsaPrivateKey).privKey.PublicKey.Verify(digest,signature),nil  //sm2 way
+	//return verifyECDSA(&(k.(*ecdsaPrivateKey).privKey.PublicKey), signature, digest, opts) //ecdsa way
 }
 
 type ecdsaPublicKeyKeyVerifier struct{}
 
 func (v *ecdsaPublicKeyKeyVerifier) Verify(k bccsp.Key, signature, digest []byte, opts bccsp.SignerOpts) (bool, error) {
-	return verifyECDSA(k.(*ecdsaPublicKey).pubKey, signature, digest, opts)
+	return k.(*ecdsaPublicKey).pubKey.Verify(digest,signature),nil  //sm2 way
+	//return verifyECDSA(k.(*ecdsaPublicKey).pubKey, signature, digest, opts)  //ecdsa way
+
 }
