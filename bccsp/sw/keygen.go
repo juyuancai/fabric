@@ -31,6 +31,7 @@ type ecdsaKeyGenerator struct {
 
 func (kg *ecdsaKeyGenerator) KeyGen(opts bccsp.KeyGenOpts) (bccsp.Key, error) {
 	//this is sm2 way
+
 	privKey, err:= sm2.GenerateKey()
 	if err != nil {
 		return nil, fmt.Errorf("Failed generating sm2 key for [%s]", err)

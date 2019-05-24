@@ -24,7 +24,8 @@ import (
 	"crypto/rsa"
 	"crypto/sha256"
 	"crypto/sha512"
-	"crypto/x509"
+	//"crypto/x509"
+	x509 "github.com/tjfoc/gmsm/sm2"
 	"crypto/x509/pkix"
 	"encoding/asn1"
 	"fmt"
@@ -43,6 +44,7 @@ import (
 	"github.com/hyperledger/fabric/bccsp/utils"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/crypto/sha3"
+
 )
 
 var (
@@ -164,7 +166,6 @@ func TestKeyGenECDSAOpts(t *testing.T) {
 	t.Parallel()
 	provider, _, cleanup := currentTestConfig.Provider(t)
 	defer cleanup()
-
 	// Curve P256
 	k, err := provider.KeyGen(&bccsp.ECDSAP256KeyGenOpts{Temporary: false})
 	if err != nil {
@@ -179,43 +180,43 @@ func TestKeyGenECDSAOpts(t *testing.T) {
 	if k.Symmetric() {
 		t.Fatal("Failed generating ECDSA P256 key. Key should be asymmetric")
 	}
-
-	ecdsaKey := k.(*ecdsaPrivateKey).privKey
-	if !elliptic.P256().IsOnCurve(ecdsaKey.X, ecdsaKey.Y) {
-		t.Fatal("P256 generated key in invalid. The public key must be on the P256 curve.")
-	}
-	if elliptic.P256() != ecdsaKey.Curve {
-		t.Fatal("P256 generated key in invalid. The curve must be P256.")
-	}
-	if ecdsaKey.D.Cmp(big.NewInt(0)) == 0 {
-		t.Fatal("P256 generated key in invalid. Private key must be different from 0.")
-	}
-
-	// Curve P384
-	k, err = provider.KeyGen(&bccsp.ECDSAP384KeyGenOpts{Temporary: false})
-	if err != nil {
-		t.Fatalf("Failed generating ECDSA P384 key [%s]", err)
-	}
-	if k == nil {
-		t.Fatal("Failed generating ECDSA P384 key. Key must be different from nil")
-	}
-	if !k.Private() {
-		t.Fatal("Failed generating ECDSA P384 key. Key should be private")
-	}
-	if k.Symmetric() {
-		t.Fatal("Failed generating ECDSA P384 key. Key should be asymmetric")
-	}
-
-	ecdsaKey = k.(*ecdsaPrivateKey).privKey
-	if !elliptic.P384().IsOnCurve(ecdsaKey.X, ecdsaKey.Y) {
-		t.Fatal("P256 generated key in invalid. The public key must be on the P384 curve.")
-	}
-	if elliptic.P384() != ecdsaKey.Curve {
-		t.Fatal("P256 generated key in invalid. The curve must be P384.")
-	}
-	if ecdsaKey.D.Cmp(big.NewInt(0)) == 0 {
-		t.Fatal("P256 generated key in invalid. Private key must be different from 0.")
-	}
+    //this curve tests is no longer needed for SM2
+	//ecdsaKey := k.(*ecdsaPrivateKey).privKey
+	//if !elliptic.P256().IsOnCurve(ecdsaKey.X, ecdsaKey.Y) {
+	//	t.Fatal("P256 generated key in invalid. The public key must be on the P256 curve.")
+	//}
+	//if elliptic.P256() != ecdsaKey.Curve {
+	//	t.Fatal("P256 generated key in invalid. The curve must be P256.")
+	//}
+	//if ecdsaKey.D.Cmp(big.NewInt(0)) == 0 {
+	//	t.Fatal("P256 generated key in invalid. Private key must be different from 0.")
+	//}
+	//
+	//// Curve P384
+	//k, err = provider.KeyGen(&bccsp.ECDSAP384KeyGenOpts{Temporary: false})
+	//if err != nil {
+	//	t.Fatalf("Failed generating ECDSA P384 key [%s]", err)
+	//}
+	//if k == nil {
+	//	t.Fatal("Failed generating ECDSA P384 key. Key must be different from nil")
+	//}
+	//if !k.Private() {
+	//	t.Fatal("Failed generating ECDSA P384 key. Key should be private")
+	//}
+	//if k.Symmetric() {
+	//	t.Fatal("Failed generating ECDSA P384 key. Key should be asymmetric")
+	//}
+	//
+	//ecdsaKey = k.(*ecdsaPrivateKey).privKey
+	//if !elliptic.P384().IsOnCurve(ecdsaKey.X, ecdsaKey.Y) {
+	//	t.Fatal("P256 generated key in invalid. The public key must be on the P384 curve.")
+	//}
+	//if elliptic.P384() != ecdsaKey.Curve {
+	//	t.Fatal("P256 generated key in invalid. The curve must be P384.")
+	//}
+	//if ecdsaKey.D.Cmp(big.NewInt(0)) == 0 {
+	//	t.Fatal("P256 generated key in invalid. Private key must be different from 0.")
+	//}
 
 }
 
@@ -1004,7 +1005,8 @@ func TestKeyImportFromX509ECDSAPublicKey(t *testing.T) {
 		t.Fatalf("Failed converting raw to ECDSA.PublicKey [%s]", err)
 	}
 
-	certRaw, err := x509.CreateCertificate(rand.Reader, &template, &template, pub, cryptoSigner)
+
+	certRaw, err :=x509.CreateCertificate(rand.Reader, &template, &template, pub, cryptoSigner)
 	if err != nil {
 		t.Fatalf("Failed generating self-signed certificate [%s]", err)
 	}
@@ -1129,7 +1131,7 @@ func TestECDSALowS(t *testing.T) {
 	// Ensure that signature with high-S are rejected.
 	var R *big.Int
 	for {
-		R, S, err = ecdsa.Sign(rand.Reader, k.(*ecdsaPrivateKey).privKey, digest)
+	//	R, S, err = ecdsa.Sign(rand.Reader, k.(*ecdsaPrivateKey).privKey, digest)
 		if err != nil {
 			t.Fatalf("Failed generating signature [%s]", err)
 		}
@@ -1808,6 +1810,7 @@ func TestKeyImportFromX509RSAPublicKey(t *testing.T) {
 	testUnknownExtKeyUsage := []asn1.ObjectIdentifier{[]int{1, 2, 3}, []int{2, 59, 1}}
 	extraExtensionData := []byte("extra extension")
 	commonName := "test.example.com"
+	//template := x509.Certificate{
 	template := x509.Certificate{
 		SerialNumber: big.NewInt(1),
 		Subject: pkix.Name{

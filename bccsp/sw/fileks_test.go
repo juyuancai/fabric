@@ -16,18 +16,15 @@ limitations under the License.
 package sw
 
 import (
-	"crypto/ecdsa"
-	"crypto/elliptic"
-	"crypto/rand"
 	"encoding/hex"
 	"fmt"
+	"github.com/hyperledger/fabric/bccsp/utils"
+	"github.com/stretchr/testify/assert"
+	"github.com/tjfoc/gmsm/sm2"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
-
-	"github.com/hyperledger/fabric/bccsp/utils"
-	"github.com/stretchr/testify/assert"
 )
 
 func TestInvalidStoreKey(t *testing.T) {
@@ -88,7 +85,8 @@ func TestBigKeyFile(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Generate a key for keystore to find
-	privKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	//privKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	privKey, err := sm2.GenerateKey()
 	assert.NoError(t, err)
 
 	cspKey := &ecdsaPrivateKey{privKey}

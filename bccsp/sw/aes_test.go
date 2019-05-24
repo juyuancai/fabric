@@ -94,7 +94,7 @@ func TestPKCS7Padding(t *testing.T) {
 	result = pkcs7Padding(ptext)
 
 	if !bytes.Equal(expected, result) {
-		t.Fatal("Padding error! Expected: '", expected, "', received: '", result, "'")
+		t.Fatal("Padding error! Expectegd: '", expected, "', received: '", result, "'")
 	}
 
 	// 3 to aes.BlockSize-1 byte plaintext
