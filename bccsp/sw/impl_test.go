@@ -18,17 +18,15 @@ package sw
 import (
 	"bytes"
 	"crypto"
-	"crypto/ecdsa"
-	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/sha256"
 	"crypto/sha512"
-	//"crypto/x509"
-	x509 "github.com/tjfoc/gmsm/sm2"
 	"crypto/x509/pkix"
 	"encoding/asn1"
 	"fmt"
+	//"crypto/x509"
+	x509 "github.com/tjfoc/gmsm/sm2"
 	"hash"
 	"io/ioutil"
 	"math/big"
@@ -44,7 +42,6 @@ import (
 	"github.com/hyperledger/fabric/bccsp/utils"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/crypto/sha3"
-
 )
 
 var (
@@ -860,7 +857,8 @@ func TestECDSAKeyImportFromECDSAPrivateKey(t *testing.T) {
 	defer cleanup()
 
 	// Generate an ECDSA key, default is P256
-	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	//key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	key, err := x509.GenerateKey()
 	if err != nil {
 		t.Fatalf("Failed generating ECDSA key [%s]", err)
 	}
@@ -953,7 +951,8 @@ func TestKeyImportFromX509ECDSAPublicKey(t *testing.T) {
 		NotBefore: time.Now().Add(-1 * time.Hour),
 		NotAfter:  time.Now().Add(1 * time.Hour),
 
-		SignatureAlgorithm: x509.ECDSAWithSHA256,
+		//SignatureAlgorithm: x509.ECDSAWithSHA256,
+		SignatureAlgorithm: x509.SM2WithSHA256,
 
 		SubjectKeyId: []byte{1, 2, 3, 4},
 		KeyUsage:     x509.KeyUsageCertSign,

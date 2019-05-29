@@ -17,12 +17,13 @@ limitations under the License.
 package utils
 
 import (
-	"crypto/ecdsa"
-	"crypto/elliptic"
 	"crypto/rand"
-	"crypto/x509"
 	"crypto/x509/pkix"
+
 	"encoding/asn1"
+	//"crypto/x509"
+	//"crypto/x509/pkix"
+	x509 "github.com/tjfoc/gmsm/sm2"
 	"math/big"
 	"net"
 	"testing"
@@ -30,7 +31,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 )
-
+// replace sign algorithms from ECDSAWithSHA256 to SM2WithSHA256 to test SM2 certifacate
 func TestDERToX509Certificate(t *testing.T) {
 	testExtKeyUsage := []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth}
 	testUnknownExtKeyUsage := []asn1.ObjectIdentifier{[]int{1, 2, 3}, []int{2, 59, 1}}
@@ -57,8 +58,8 @@ func TestDERToX509Certificate(t *testing.T) {
 		NotBefore: time.Now().Add(-1 * time.Hour),
 		NotAfter:  time.Now().Add(1 * time.Hour),
 
-		SignatureAlgorithm: x509.ECDSAWithSHA256,
-
+		//SignatureAlgorithm: x509.ECDSAWithSHA256,// ecdsa signer
+		SignatureAlgorithm: x509.SM2WithSHA256,
 		SubjectKeyId: []byte{1, 2, 3, 4},
 		KeyUsage:     x509.KeyUsageCertSign,
 
@@ -88,7 +89,8 @@ func TestDERToX509Certificate(t *testing.T) {
 		},
 	}
 
-	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	//key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	key, err := x509.GenerateKey()   //generate a sm2 key
 	assert.NoError(t, err)
 	certRaw, err := x509.CreateCertificate(rand.Reader, &template, &template, key.Public(), key)
 	assert.NoError(t, err)

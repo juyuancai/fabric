@@ -130,7 +130,7 @@ func (*ecdsaGoPublicKeyImportOptsKeyImporter) KeyImport(raw interface{}, opts bc
 	lowLevelKey, ok := raw.(*sm2.PublicKey)  //sm2 way
 	if !ok {
 		//return nil, errors.New("Invalid raw material. Expected *ecdsa.PublicKey.")
-		return nil, errors.New("Invalid raw material. Expected *sm2.PublicKey.")
+		return nil, errors.New("Invalid raw material. Expected *SM2.PublicKey.")
 	}
 
 	return &ecdsaPublicKey{lowLevelKey}, nil

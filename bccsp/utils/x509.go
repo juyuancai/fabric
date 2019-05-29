@@ -15,9 +15,10 @@ limitations under the License.
 */
 
 package utils
-
+// change to sm2 supported way
 import (
-	"crypto/x509"
+	//"crypto/x509"
+	x509 "github.com/tjfoc/gmsm/sm2"
 )
 
 // DERToX509Certificate converts der to x509

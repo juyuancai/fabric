@@ -69,14 +69,20 @@ func oidFromNamedCurve(curve elliptic.Curve) (asn1.ObjectIdentifier, bool) {
 }
 
 // PrivateKeyToDER marshals a private key to der
-func PrivateKeyToDER(privateKey *ecdsa.PrivateKey) ([]byte, error) {
+// now we change this to sm2
+//func PrivateKeyToDER(privateKey *ecdsa.PrivateKey) ([]byte, error) {
+//	if privateKey == nil {
+//		return nil, errors.New("Invalid ecdsa private key. It must be different from nil.")
+//	}
+//
+//	return x509.MarshalECPrivateKey(privateKey)
+//}
+func PrivateKeyToDER(privateKey *sm2.PrivateKey) ([]byte, error) {
 	if privateKey == nil {
 		return nil, errors.New("Invalid ecdsa private key. It must be different from nil.")
 	}
-
-	return x509.MarshalECPrivateKey(privateKey)
+	return sm2.MarshalSm2PrivateKey(privateKey,nil)
 }
-
 // PrivateKeyToPEM converts the private key to PEM format.
 // EC private keys are converted to PKCS#8 format.
 // RSA private keys are converted to PKCS#1 format.
