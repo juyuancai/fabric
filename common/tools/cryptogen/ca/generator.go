@@ -9,7 +9,6 @@ import (
 	"crypto"
 	"crypto/ecdsa"
 	"crypto/rand"
-	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
 	"io/ioutil"
@@ -22,6 +21,7 @@ import (
 
 	"github.com/hyperledger/fabric/bccsp/utils"
 	"github.com/hyperledger/fabric/common/tools/cryptogen/csp"
+	"github.com/tjfoc/gmsm/sm2"
 )
 
 type CA struct {
@@ -34,7 +34,7 @@ type CA struct {
 	PostalCode         string
 	//SignKey  *ecdsa.PrivateKey
 	Signer   crypto.Signer
-	SignCert *x509.Certificate
+	SignCert *sm2.Certificate
 }
 
 // NewCA creates an instance of CA and saves the signing key pair in
@@ -56,12 +56,12 @@ func NewCA(baseDir, org, name, country, province, locality, orgUnit, streetAddre
 				template := x509Template()
 				//this is a CA
 				template.IsCA = true
-				template.KeyUsage |= x509.KeyUsageDigitalSignature |
-					x509.KeyUsageKeyEncipherment | x509.KeyUsageCertSign |
-					x509.KeyUsageCRLSign
-				template.ExtKeyUsage = []x509.ExtKeyUsage{
-					x509.ExtKeyUsageClientAuth,
-					x509.ExtKeyUsageServerAuth,
+				template.KeyUsage |= sm2.KeyUsageDigitalSignature |
+					sm2.KeyUsageKeyEncipherment | sm2.KeyUsageCertSign |
+					sm2.KeyUsageCRLSign
+				template.ExtKeyUsage = []sm2.ExtKeyUsage{
+					sm2.ExtKeyUsageClientAuth,
+					sm2.ExtKeyUsageServerAuth,
 				}
 
 				//set the organization for the subject
@@ -97,7 +97,7 @@ func NewCA(baseDir, org, name, country, province, locality, orgUnit, streetAddre
 // SignCertificate creates a signed certificate based on a built-in template
 // and saves it in baseDir/name
 func (ca *CA) SignCertificate(baseDir, name string, ous, sans []string, pub *ecdsa.PublicKey,
-	ku x509.KeyUsage, eku []x509.ExtKeyUsage) (*x509.Certificate, error) {
+	ku sm2.KeyUsage, eku []sm2.ExtKeyUsage) (*sm2.Certificate, error) {
 
 	template := x509Template()
 	template.KeyUsage = ku
@@ -165,7 +165,7 @@ func subjectTemplateAdditional(country, province, locality, orgUnit, streetAddre
 }
 
 // default template for X509 certificates
-func x509Template() x509.Certificate {
+func x509Template() sm2.Certificate {
 
 	// generate a serial number
 	serialNumberLimit := new(big.Int).Lsh(big.NewInt(1), 128)
@@ -177,7 +177,7 @@ func x509Template() x509.Certificate {
 	notBefore := time.Now().Round(time.Minute).Add(-5 * time.Minute).UTC()
 
 	//basic template to use
-	x509 := x509.Certificate{
+	x509 := sm2.Certificate{
 		SerialNumber:          serialNumber,
 		NotBefore:             notBefore,
 		NotAfter:              notBefore.Add(expiry).UTC(),
@@ -188,11 +188,11 @@ func x509Template() x509.Certificate {
 }
 
 // generate a signed X509 certificate using ECDSA
-func genCertificateECDSA(baseDir, name string, template, parent *x509.Certificate, pub *ecdsa.PublicKey,
-	priv interface{}) (*x509.Certificate, error) {
+func genCertificateECDSA(baseDir, name string, template, parent *sm2.Certificate, pub *ecdsa.PublicKey,
+	priv interface{}) (*sm2.Certificate, error) {
 
 	//create the x509 public cert
-	certBytes, err := x509.CreateCertificate(rand.Reader, template, parent, pub, priv)
+	certBytes, err := sm2.CreateCertificate(rand.Reader, template, parent, pub, priv)
 	if err != nil {
 		return nil, err
 	}
@@ -210,7 +210,7 @@ func genCertificateECDSA(baseDir, name string, template, parent *x509.Certificat
 		return nil, err
 	}
 
-	x509Cert, err := x509.ParseCertificate(certBytes)
+	x509Cert, err := sm2.ParseCertificate(certBytes)
 	if err != nil {
 		return nil, err
 	}
@@ -218,8 +218,8 @@ func genCertificateECDSA(baseDir, name string, template, parent *x509.Certificat
 }
 
 // LoadCertificateECDSA load a ecdsa cert from a file in cert path
-func LoadCertificateECDSA(certPath string) (*x509.Certificate, error) {
-	var cert *x509.Certificate
+func LoadCertificateECDSA(certPath string) (*sm2.Certificate, error) {
+	var cert *sm2.Certificate
 	var err error
 
 	walkFunc := func(path string, info os.FileInfo, err error) error {

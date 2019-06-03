@@ -6,9 +6,9 @@ SPDX-License-Identifier: Apache-2.0
 package msp
 
 import (
-	"crypto/x509"
 	"encoding/hex"
 	"encoding/pem"
+	"github.com/tjfoc/gmsm/sm2"
 	"os"
 	"path/filepath"
 
@@ -76,7 +76,7 @@ func GenerateLocalMSP(baseDir, name string, sans []string, signCA *ca.CA,
 		ous = []string{nodeOUMap[nodeType]}
 	}
 	cert, err := signCA.SignCertificate(filepath.Join(mspDir, "signcerts"),
-		name, ous, nil, ecPubKey, x509.KeyUsageDigitalSignature, []x509.ExtKeyUsage{})
+		name, ous, nil, ecPubKey, sm2.KeyUsageDigitalSignature, []sm2.ExtKeyUsage{})
 	if err != nil {
 		return err
 	}
@@ -127,8 +127,8 @@ func GenerateLocalMSP(baseDir, name string, sans []string, signCA *ca.CA,
 	}
 	// generate X509 certificate using TLS CA
 	_, err = tlsCA.SignCertificate(filepath.Join(tlsDir),
-		name, nil, sans, tlsPubKey, x509.KeyUsageDigitalSignature|x509.KeyUsageKeyEncipherment,
-		[]x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth})
+		name, nil, sans, tlsPubKey, sm2.KeyUsageDigitalSignature|sm2.KeyUsageKeyEncipherment,
+		[]sm2.ExtKeyUsage{sm2.ExtKeyUsageServerAuth, sm2.ExtKeyUsageClientAuth})
 	if err != nil {
 		return err
 	}
@@ -191,7 +191,7 @@ func GenerateVerifyingMSP(baseDir string, signCA *ca.CA, tlsCA *ca.CA, nodeOUs b
 		return err
 	}
 	_, err = signCA.SignCertificate(filepath.Join(baseDir, "admincerts"), signCA.Name,
-		nil, nil, ecPubKey, x509.KeyUsageDigitalSignature, []x509.ExtKeyUsage{})
+		nil, nil, ecPubKey, sm2.KeyUsageDigitalSignature, []sm2.ExtKeyUsage{})
 	if err != nil {
 		return err
 	}
@@ -227,7 +227,7 @@ func x509Filename(name string) string {
 	return name + "-cert.pem"
 }
 
-func x509Export(path string, cert *x509.Certificate) error {
+func x509Export(path string, cert *sm2.Certificate) error {
 	return pemExport(path, "CERTIFICATE", cert.Raw)
 }
 

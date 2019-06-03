@@ -17,50 +17,49 @@ limitations under the License.
 package sw
 
 import (
-	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/sha256"
-	"crypto/x509"
+	"github.com/stretchr/testify/assert"
+	"github.com/tjfoc/gmsm/sm2"
 	"math/big"
 	"testing"
-
-	"github.com/hyperledger/fabric/bccsp/utils"
-	"github.com/stretchr/testify/assert"
 )
 
-func TestSignECDSABadParameter(t *testing.T) {
-	// Generate a key
-	lowLevelKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-	assert.NoError(t, err)
-
-	// Induce an error on the underlying ecdsa algorithm
-	msg := []byte("hello world")
-	oldN := lowLevelKey.Params().N
-	defer func() { lowLevelKey.Params().N = oldN }()
-	lowLevelKey.Params().N = big.NewInt(0)
-	_, err = signECDSA(lowLevelKey, msg, nil)
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "zero parameter")
-	lowLevelKey.Params().N = oldN
-}
+//func TestSignECDSABadParameter(t *testing.T) {
+//	// Generate a key
+//	lowLevelKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+//	assert.NoError(t, err)
+//
+//	// Induce an error on the underlying ecdsa algorithm
+//	msg := []byte("hello world")
+//	oldN := lowLevelKey.Params().N
+//	defer func() { lowLevelKey.Params().N = oldN }()
+//	lowLevelKey.Params().N = big.NewInt(0)
+//	_, err = signECDSA(lowLevelKey, msg, nil)
+//	assert.Error(t, err)
+//	assert.Contains(t, err.Error(), "zero parameter")
+//	lowLevelKey.Params().N = oldN
+//}
 
 func TestVerifyECDSA(t *testing.T) {
 	t.Parallel()
 
 	// Generate a key
-	lowLevelKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	lowLevelKey, err:=sm2.GenerateKey()
+	//lowLevelKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	assert.NoError(t, err)
 
 	msg := []byte("hello world")
-	sigma, err := signECDSA(lowLevelKey, msg, nil)
+	sigma, err := lowLevelKey.Sign(rand.Reader,msg,nil)
+	//sigma, err := signECDSA(lowLevelKey, msg, nil)
 	assert.NoError(t, err)
-
-	valid, err := verifyECDSA(&lowLevelKey.PublicKey, sigma, msg, nil)
-	assert.NoError(t, err)
+	valid:= lowLevelKey.PublicKey.Verify(msg,sigma)
+	//valid, err := verifyECDSA(&lowLevelKey.PublicKey, sigma, msg, nil)
+	//assert.NoError(t, err)
 	assert.True(t, valid)
 
-	_, err = verifyECDSA(&lowLevelKey.PublicKey, nil, msg, nil)
+	/*_, err = verifyECDSA(&lowLevelKey.PublicKey, nil, msg, nil)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "Failed unmashalling signature [")
 
@@ -75,7 +74,7 @@ func TestVerifyECDSA(t *testing.T) {
 	assert.NoError(t, err)
 	_, err = verifyECDSA(&lowLevelKey.PublicKey, sigmaWrongS, msg, nil)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "Invalid S. Must be smaller than half the order [")
+	assert.Contains(t, err.Error(), "Invalid S. Must be smaller than half the order [")*/
 }
 
 func TestEcdsaSignerSign(t *testing.T) {
@@ -86,7 +85,8 @@ func TestEcdsaSignerSign(t *testing.T) {
 	verifierPublicKey := &ecdsaPublicKeyKeyVerifier{}
 
 	// Generate a key
-	lowLevelKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	//lowLevelKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	lowLevelKey, err:=sm2.GenerateKey()
 	assert.NoError(t, err)
 	k := &ecdsaPrivateKey{lowLevelKey}
 	pk, err := k.PublicKey()
@@ -99,8 +99,9 @@ func TestEcdsaSignerSign(t *testing.T) {
 	assert.NotNil(t, sigma)
 
 	// Verify
-	valid, err := verifyECDSA(&lowLevelKey.PublicKey, sigma, msg, nil)
-	assert.NoError(t, err)
+	//valid, err := verifyECDSA(&lowLevelKey.PublicKey, sigma, msg, nil)
+	valid:= lowLevelKey.PublicKey.Verify(msg,sigma)
+//	assert.NoError(t, err)
 	assert.True(t, valid)
 
 	valid, err = verifierPrivateKey.Verify(k, sigma, msg, nil)
@@ -114,9 +115,10 @@ func TestEcdsaSignerSign(t *testing.T) {
 
 func TestEcdsaPrivateKey(t *testing.T) {
 	t.Parallel()
-
-	lowLevelKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	lowLevelKey, err:=sm2.GenerateKey()
+	//lowLevelKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	assert.NoError(t, err)
+
 	k := &ecdsaPrivateKey{lowLevelKey}
 
 	assert.False(t, k.Symmetric())
@@ -149,7 +151,8 @@ func TestEcdsaPrivateKey(t *testing.T) {
 func TestEcdsaPublicKey(t *testing.T) {
 	t.Parallel()
 
-	lowLevelKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	//lowLevelKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	lowLevelKey, err:=sm2.GenerateKey()
 	assert.NoError(t, err)
 	k := &ecdsaPublicKey{&lowLevelKey.PublicKey}
 
@@ -174,12 +177,13 @@ func TestEcdsaPublicKey(t *testing.T) {
 
 	bytes, err := k.Bytes()
 	assert.NoError(t, err)
-	bytes2, err := x509.MarshalPKIXPublicKey(k.pubKey)
+	//bytes2, err := x509.MarshalPKIXPublicKey(k.pubKey)
+	bytes2, err := sm2.MarshalPKIXPublicKey(k.pubKey)
 	assert.Equal(t, bytes2, bytes, "bytes are not computed in the right way.")
 
 	invalidCurve := &elliptic.CurveParams{Name: "P-Invalid"}
 	invalidCurve.BitSize = 1024
-	k.pubKey = &ecdsa.PublicKey{Curve: invalidCurve, X: big.NewInt(1), Y: big.NewInt(1)}
+	k.pubKey = &sm2.PublicKey{Curve: invalidCurve, X: big.NewInt(1), Y: big.NewInt(1)}
 	_, err = k.Bytes()
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "Failed marshalling key [")

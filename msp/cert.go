@@ -19,7 +19,7 @@ package msp
 import (
 	"bytes"
 	"crypto/ecdsa"
-	"crypto/x509"
+	x509 "github.com/tjfoc/gmsm/sm2"
 	"crypto/x509/pkix"
 	"encoding/asn1"
 	"encoding/pem"

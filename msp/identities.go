@@ -9,7 +9,7 @@ package msp
 import (
 	"crypto"
 	"crypto/rand"
-	"crypto/x509"
+	x509 "github.com/tjfoc/gmsm/sm2"
 	"encoding/hex"
 	"encoding/pem"
 	"time"

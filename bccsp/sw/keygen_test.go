@@ -68,7 +68,8 @@ func TestECDSAKeyGenerator(t *testing.T) {
 	ecdsaK, ok := k.(*ecdsaPrivateKey)
 	assert.True(t, ok)
 	assert.NotNil(t, ecdsaK.privKey)
-	assert.Equal(t, ecdsaK.privKey.Curve, elliptic.P256())
+	//since we change to sm2, this equal is not needed
+	//assert.Equal(t, ecdsaK.privKey.Curve, elliptic.P256())
 }
 
 func TestRSAKeyGenerator(t *testing.T) {

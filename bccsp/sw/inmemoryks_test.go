@@ -7,13 +7,10 @@ SPDX-License-Identifier: Apache-2.0
 package sw
 
 import (
-	"crypto/ecdsa"
-	"crypto/elliptic"
-	"crypto/rand"
 	"fmt"
-	"testing"
-
 	"github.com/stretchr/testify/assert"
+	"github.com/tjfoc/gmsm/sm2"
+	"testing"
 )
 
 func TestInvalidStore(t *testing.T) {
@@ -50,7 +47,8 @@ func TestStoreLoad(t *testing.T) {
 	ks := NewInMemoryKeyStore()
 
 	// generate a key for the keystore to find
-	privKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	//privKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	privKey, err := sm2.GenerateKey()
 	assert.NoError(t, err)
 	cspKey := &ecdsaPrivateKey{privKey}
 
@@ -78,7 +76,8 @@ func TestStoreExisting(t *testing.T) {
 	ks := NewInMemoryKeyStore()
 
 	// generate a key for the keystore to find
-	privKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	//privKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	privKey, err := sm2.GenerateKey()
 	assert.NoError(t, err)
 	cspKey := &ecdsaPrivateKey{privKey}
 

@@ -17,10 +17,10 @@ limitations under the License.
 package utils
 
 import (
-	"crypto/x509"
+	"github.com/tjfoc/gmsm/sm2"
 )
 
 // DERToX509Certificate converts der to x509
-func DERToX509Certificate(asn1Data []byte) (*x509.Certificate, error) {
-	return x509.ParseCertificate(asn1Data)
+func DERToX509Certificate(asn1Data []byte) (*sm2.Certificate, error) {
+	return sm2.ParseCertificate(asn1Data)
 }

@@ -27,7 +27,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
-
+	"github.com/tjfoc/gmsm/sm2"
 	"github.com/hyperledger/fabric/bccsp"
 	"github.com/hyperledger/fabric/bccsp/utils"
 )
@@ -110,6 +110,7 @@ func (ks *fileBasedKeyStore) ReadOnly() bool {
 }
 
 // GetKey returns a key object whose SKI is the one passed.
+//change ecdsa key to SM2
 func (ks *fileBasedKeyStore) GetKey(ski []byte) (bccsp.Key, error) {
 	// Validate arguments
 	if len(ski) == 0 {
@@ -135,8 +136,9 @@ func (ks *fileBasedKeyStore) GetKey(ski []byte) (bccsp.Key, error) {
 		}
 
 		switch key.(type) {
-		case *ecdsa.PrivateKey:
-			return &ecdsaPrivateKey{key.(*ecdsa.PrivateKey)}, nil
+		case *sm2.PrivateKey:
+			//return &ecdsaPrivateKey{key.(*ecdsa.PrivateKey)}, nil //ecdsa
+			return &ecdsaPrivateKey{key.(*sm2.PrivateKey)}, nil
 		case *rsa.PrivateKey:
 			return &rsaPrivateKey{key.(*rsa.PrivateKey)}, nil
 		default:
@@ -151,7 +153,8 @@ func (ks *fileBasedKeyStore) GetKey(ski []byte) (bccsp.Key, error) {
 
 		switch key.(type) {
 		case *ecdsa.PublicKey:
-			return &ecdsaPublicKey{key.(*ecdsa.PublicKey)}, nil
+			//return &ecdsaPublicKey{key.(*ecdsa.PublicKey)}, nil  //ecdsa way
+			return &ecdsaPublicKey{key.(*sm2.PublicKey)}, nil  //sm2 way
 		case *rsa.PublicKey:
 			return &rsaPublicKey{key.(*rsa.PublicKey)}, nil
 		default:
@@ -243,8 +246,10 @@ func (ks *fileBasedKeyStore) searchKeystoreForSKI(ski []byte) (k bccsp.Key, err 
 		}
 
 		switch key.(type) {
-		case *ecdsa.PrivateKey:
-			k = &ecdsaPrivateKey{key.(*ecdsa.PrivateKey)}
+		//case *ecdsa.PrivateKey:
+		//k = &ecdsaPrivateKey{key.(*ecdsa.PrivateKey)}
+		case *sm2.PrivateKey:
+			k = &ecdsaPrivateKey{key.(*sm2.PrivateKey)}
 		case *rsa.PrivateKey:
 			k = &rsaPrivateKey{key.(*rsa.PrivateKey)}
 		default:

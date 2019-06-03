@@ -8,7 +8,7 @@ package msp
 
 import (
 	"bytes"
-	"crypto/x509"
+	x509 "github.com/tjfoc/gmsm/sm2"
 	"crypto/x509/pkix"
 	"encoding/asn1"
 	"math/big"

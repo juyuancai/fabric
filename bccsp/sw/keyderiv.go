@@ -17,17 +17,18 @@ limitations under the License.
 package sw
 
 import (
-	"crypto/ecdsa"
 	"crypto/hmac"
 	"errors"
 	"fmt"
-	"math/big"
-
 	"github.com/hyperledger/fabric/bccsp"
+	"github.com/tjfoc/gmsm/sm2"
+	"math/big"
 )
 
 type ecdsaPublicKeyKeyDeriver struct{}
 
+
+// here we do not change any deriv algorithms ,but we only change ecdsa struct to sm2 struct
 func (kd *ecdsaPublicKeyKeyDeriver) KeyDeriv(k bccsp.Key, opts bccsp.KeyDerivOpts) (bccsp.Key, error) {
 	// Validate opts
 	if opts == nil {
@@ -35,12 +36,16 @@ func (kd *ecdsaPublicKeyKeyDeriver) KeyDeriv(k bccsp.Key, opts bccsp.KeyDerivOpt
 	}
 
 	ecdsaK := k.(*ecdsaPublicKey)
-
 	switch opts.(type) {
 	// Re-randomized an ECDSA private key
 	case *bccsp.ECDSAReRandKeyOpts:
 		reRandOpts := opts.(*bccsp.ECDSAReRandKeyOpts)
-		tempSK := &ecdsa.PublicKey{
+		/*tempSK := &ecdsa.PublicKey{
+			Curve: ecdsaK.pubKey.Curve,
+			X:     new(big.Int),
+			Y:     new(big.Int),
+		}*/
+		tempSK := &sm2.PublicKey{    //  sm2 struct
 			Curve: ecdsaK.pubKey.Curve,
 			X:     new(big.Int),
 			Y:     new(big.Int),
@@ -73,6 +78,8 @@ func (kd *ecdsaPublicKeyKeyDeriver) KeyDeriv(k bccsp.Key, opts bccsp.KeyDerivOpt
 
 type ecdsaPrivateKeyKeyDeriver struct{}
 
+
+// same as function func (kd *ecdsaPublicKeyKeyDeriver) KeyDeriv(k bccsp.Key, opts bccsp.KeyDerivOpts) (bccsp.Key, error)
 func (kd *ecdsaPrivateKeyKeyDeriver) KeyDeriv(k bccsp.Key, opts bccsp.KeyDerivOpts) (bccsp.Key, error) {
 	// Validate opts
 	if opts == nil {
@@ -85,15 +92,22 @@ func (kd *ecdsaPrivateKeyKeyDeriver) KeyDeriv(k bccsp.Key, opts bccsp.KeyDerivOp
 	// Re-randomized an ECDSA private key
 	case *bccsp.ECDSAReRandKeyOpts:
 		reRandOpts := opts.(*bccsp.ECDSAReRandKeyOpts)
-		tempSK := &ecdsa.PrivateKey{
-			PublicKey: ecdsa.PublicKey{
+		//tempSK := &ecdsa.PrivateKey{
+		//	PublicKey: ecdsa.PublicKey{
+		//		Curve: ecdsaK.privKey.Curve,
+		//		X:     new(big.Int),
+		//		Y:     new(big.Int),
+		//	},
+		//	D: new(big.Int),
+		//}
+		tempSK := &sm2.PrivateKey{
+			PublicKey: sm2.PublicKey{
 				Curve: ecdsaK.privKey.Curve,
 				X:     new(big.Int),
 				Y:     new(big.Int),
 			},
 			D: new(big.Int),
 		}
-
 		var k = new(big.Int).SetBytes(reRandOpts.ExpansionValue())
 		var one = new(big.Int).SetInt64(1)
 		n := new(big.Int).Sub(ecdsaK.privKey.Params().N, one)

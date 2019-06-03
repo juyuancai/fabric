@@ -28,6 +28,7 @@ import (
 	"github.com/hyperledger/fabric/bccsp/sw/mocks"
 	"github.com/hyperledger/fabric/bccsp/utils"
 	"github.com/stretchr/testify/assert"
+
 )
 
 func TestKeyImport(t *testing.T) {
@@ -122,7 +123,7 @@ func TestECDSAPKIXPublicKeyImportOptsKeyImporter(t *testing.T) {
 
 	_, err = ki.KeyImport([]byte{0}, &mocks2.KeyImportOpts{})
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "Failed converting PKIX to ECDSA public key [")
+	assert.Contains(t, err.Error(), "Failed converting PKIX to SM2 public key [")
 
 	k, err := rsa.GenerateKey(rand.Reader, 512)
 	assert.NoError(t, err)
@@ -130,7 +131,7 @@ func TestECDSAPKIXPublicKeyImportOptsKeyImporter(t *testing.T) {
 	assert.NoError(t, err)
 	_, err = ki.KeyImport(raw, &mocks2.KeyImportOpts{})
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "Failed casting to ECDSA public key. Invalid raw material.")
+	assert.Contains(t, err.Error(), "Failed casting to SM2 public key. Invalid raw material.")
 }
 
 func TestECDSAPrivateKeyImportOptsKeyImporter(t *testing.T) {
@@ -152,14 +153,14 @@ func TestECDSAPrivateKeyImportOptsKeyImporter(t *testing.T) {
 
 	_, err = ki.KeyImport([]byte{0}, &mocks2.KeyImportOpts{})
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "Failed converting PKIX to ECDSA public key")
+	assert.Contains(t, err.Error(), "Failed converting PKIX to SM2 public key")
 
 	k, err := rsa.GenerateKey(rand.Reader, 512)
 	assert.NoError(t, err)
 	raw := x509.MarshalPKCS1PrivateKey(k)
 	_, err = ki.KeyImport(raw, &mocks2.KeyImportOpts{})
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "Failed casting to ECDSA private key. Invalid raw material.")
+	assert.Contains(t, err.Error(), "Failed casting to SM2 private key. Invalid raw material.")
 }
 
 func TestECDSAGoPublicKeyImportOptsKeyImporter(t *testing.T) {
@@ -169,11 +170,11 @@ func TestECDSAGoPublicKeyImportOptsKeyImporter(t *testing.T) {
 
 	_, err := ki.KeyImport("Hello World", &mocks2.KeyImportOpts{})
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "Invalid raw material. Expected *ecdsa.PublicKey.")
+	assert.Contains(t, err.Error(), "Invalid raw material. Expected *SM2.PublicKey.")
 
 	_, err = ki.KeyImport(nil, &mocks2.KeyImportOpts{})
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "Invalid raw material. Expected *ecdsa.PublicKey.")
+	assert.Contains(t, err.Error(), "Invalid raw material. Expected *SM2.PublicKey.")
 }
 
 func TestRSAGoPublicKeyImportOptsKeyImporter(t *testing.T) {
@@ -197,11 +198,11 @@ func TestX509PublicKeyImportOptsKeyImporter(t *testing.T) {
 
 	_, err := ki.KeyImport("Hello World", &mocks2.KeyImportOpts{})
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "Invalid raw material. Expected *x509.Certificate.")
+	assert.Contains(t, err.Error(), "Invalid raw material. Expected SM2 *x509.Certificate.")
 
 	_, err = ki.KeyImport(nil, &mocks2.KeyImportOpts{})
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "Invalid raw material. Expected *x509.Certificate.")
+	assert.Contains(t, err.Error(), "Invalid raw material. Expected SM2 *x509.Certificate.")
 
 	cert := &x509.Certificate{}
 	cert.PublicKey = "Hello world"

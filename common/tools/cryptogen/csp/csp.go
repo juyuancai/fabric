@@ -8,8 +8,9 @@ package csp
 import (
 	"crypto"
 	"crypto/ecdsa"
-	"crypto/x509"
+	//"crypto/x509"
 	"encoding/pem"
+	"github.com/tjfoc/gmsm/sm2"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -122,7 +123,7 @@ func GetECPublicKey(priv bccsp.Key) (*ecdsa.PublicKey, error) {
 		return nil, err
 	}
 	// unmarshal using pkix
-	ecPubKey, err := x509.ParsePKIXPublicKey(pubKeyBytes)
+	ecPubKey, err := sm2.ParsePKIXPublicKey(pubKeyBytes)
 	if err != nil {
 		return nil, err
 	}

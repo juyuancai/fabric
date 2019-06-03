@@ -13,21 +13,24 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
+
+//Juyuan Cai: has changed to guomi sm2 without changing the ecdsa function names
+
 package sw
 
 import (
-	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/sha256"
-	"crypto/x509"
 	"errors"
 	"fmt"
-
 	"github.com/hyperledger/fabric/bccsp"
+	"github.com/tjfoc/gmsm/sm2"
 )
 
+
+
 type ecdsaPrivateKey struct {
-	privKey *ecdsa.PrivateKey
+	privKey *sm2.PrivateKey   //change ecdsa to sm2
 }
 
 // Bytes converts this key to its byte representation,
@@ -70,13 +73,15 @@ func (k *ecdsaPrivateKey) PublicKey() (bccsp.Key, error) {
 }
 
 type ecdsaPublicKey struct {
-	pubKey *ecdsa.PublicKey
+	pubKey *sm2.PublicKey       //change ecdsa to sm2
 }
 
 // Bytes converts this key to its byte representation,
 // if this operation is allowed.
+//change this to SM2 way
 func (k *ecdsaPublicKey) Bytes() (raw []byte, err error) {
-	raw, err = x509.MarshalPKIXPublicKey(k.pubKey)
+	raw, err =sm2.MarshalPKIXPublicKey(k.pubKey)  //sm2 supported way
+	//raw, err = x509.MarshalPKIXPublicKey(k.pubKey)
 	if err != nil {
 		return nil, fmt.Errorf("Failed marshalling key [%s]", err)
 	}
