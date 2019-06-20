@@ -118,7 +118,7 @@ func GenerateLocalMSP(baseDir, name string, sans []string, signCA *ca.CA,
 	*/
 
 	// generate private key
-	tlsPrivKey, _, err := csp.GeneratePrivateKey(tlsDir)
+	tlsPrivKey, _, err := csp.GenerateTLSPrivateKey(tlsDir)
 	if err != nil {
 		return err
 	}
