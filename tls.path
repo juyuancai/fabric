@@ -1,0 +1,411 @@
+diff --git a/common/tools/cryptogen/ca/generator.go b/common/tools/cryptogen/ca/generator.go
+index ca0a7e016..a00c3cf97 100644
+--- a/common/tools/cryptogen/ca/generator.go
++++ b/common/tools/cryptogen/ca/generator.go
+@@ -43,6 +43,21 @@ type CA struct {
+ 	Sm2Key      bccsp.Key
+ }
+ 
++type TLSCA struct {
++	Name               string
++	Country            string
++	Province           string
++	Locality           string
++	OrganizationalUnit string
++	StreetAddress      string
++	PostalCode         string
++	SignKey  *ecdsa.PrivateKey
++	Signer      crypto.Signer
++	SignCert    *x509.Certificate
++
++}
++
++
+ // NewCA creates an instance of CA and saves the signing key pair in
+ // baseDir/name
+ func NewCA(baseDir, org, name, country, province, locality, orgUnit, streetAddress, postalCode string) (*CA, error) {
+@@ -109,6 +124,64 @@ func NewCA(baseDir, org, name, country, province, locality, orgUnit, streetAddre
+ 	return ca, response
+ }
+ 
++func NewTLSCA(baseDir, org, name, country, province, locality, orgUnit, streetAddress, postalCode string) (*TLSCA, error) {
++
++	var response error
++	var ca *TLSCA
++
++	err := os.MkdirAll(baseDir, 0755)
++	if err == nil {
++		priv, signer, err := csp.GenerateTLSPrivateKey(baseDir)
++		response = err
++		if err == nil {
++			// get public signing certificate
++			ecPubKey, err := csp.GetECPublicKey(priv)
++
++			response = err
++			if err == nil {
++				template := x509Template()
++				//this is a CA
++				template.IsCA = true
++				template.KeyUsage |= x509.KeyUsageDigitalSignature |
++					x509.KeyUsageKeyEncipherment | x509.KeyUsageCertSign |
++					x509.KeyUsageCRLSign
++				template.ExtKeyUsage = []x509.ExtKeyUsage{
++					x509.ExtKeyUsageClientAuth,
++					x509.ExtKeyUsageServerAuth,
++				}
++
++				//set the organization for the subject
++				subject := subjectTemplateAdditional(country, province, locality, orgUnit, streetAddress, postalCode)
++				subject.Organization = []string{org}
++				subject.CommonName = name
++
++				template.Subject = subject
++				template.SubjectKeyId = priv.SKI()
++
++				x509Cert, err := genCertificateECDSA(baseDir, name, &template, &template,
++					ecPubKey, signer)
++
++				response = err
++				if err == nil {
++					ca = &TLSCA{
++						Name: name,
++						Signer:             signer,
++						SignCert:           x509Cert,
++						Country:            country,
++						Province:           province,
++						Locality:           locality,
++						OrganizationalUnit: orgUnit,
++						StreetAddress:      streetAddress,
++						PostalCode:         postalCode,
++					}
++				}
++			}
++		}
++	}
++	return ca, response
++}
++
++
+ // SignCertificate creates a signed certificate based on a built-in template
+ // and saves it in baseDir/name
+ func (ca *CA) SignCertificate(baseDir, name string, ous, sans []string, pub *sm2.PublicKey,
+@@ -149,6 +222,40 @@ func (ca *CA) SignCertificate(baseDir, name string, ous, sans []string, pub *sm2
+ 	return cert, nil
+ }
+ 
++func (ca *TLSCA) SignCertificate(baseDir, name string, ous, sans []string, pub *ecdsa.PublicKey,
++	ku x509.KeyUsage, eku []x509.ExtKeyUsage) (*x509.Certificate, error) {
++
++	template := x509Template()
++	template.KeyUsage = ku
++	template.ExtKeyUsage = eku
++
++	//set the organization for the subject
++	subject := subjectTemplateAdditional(ca.Country, ca.Province, ca.Locality, ca.OrganizationalUnit, ca.StreetAddress, ca.PostalCode)
++	subject.CommonName = name
++
++	subject.OrganizationalUnit = append(subject.OrganizationalUnit, ous...)
++
++	template.Subject = subject
++	for _, san := range sans {
++		// try to parse as an IP address first
++		ip := net.ParseIP(san)
++		if ip != nil {
++			template.IPAddresses = append(template.IPAddresses, ip)
++		} else {
++			template.DNSNames = append(template.DNSNames, san)
++		}
++	}
++
++	template.PublicKey = pub
++	cert, err := genCertificateECDSA(baseDir, name, &template, ca.SignCert,
++		pub, ca.Signer)
++
++	if err != nil {
++		return nil, err
++	}
++	return cert, nil
++}
++
+ // default template for X509 subject
+ func subjectTemplate() pkix.Name {
+ 	return pkix.Name{
+diff --git a/common/tools/cryptogen/csp/csp.go b/common/tools/cryptogen/csp/csp.go
+index 87ff8ebff..99ee1b161 100644
+--- a/common/tools/cryptogen/csp/csp.go
++++ b/common/tools/cryptogen/csp/csp.go
+@@ -22,6 +22,94 @@ import (
+ 	"github.com/tjfoc/gmsm/sm2"
+ )
+ 
++// LoadPrivateKey loads a private key from file in keystorePath
++func LoadTLSPrivateKey(keystorePath string) (bccsp.Key, crypto.Signer, error) {
++	var err error
++	var priv bccsp.Key
++	var s crypto.Signer
++
++	opts := &factory.FactoryOpts{
++		ProviderName: "SW",
++		SwOpts: &factory.SwOpts{
++			HashFamily: "SHA2",
++			SecLevel:   256,
++
++			FileKeystore: &factory.FileKeystoreOpts{
++				KeyStorePath: keystorePath,
++			},
++		},
++	}
++
++	csp, err := factory.GetBCCSPFromOpts(opts)
++	if err != nil {
++		return nil, nil, err
++	}
++
++	walkFunc := func(path string, info os.FileInfo, err error) error {
++		if strings.HasSuffix(path, "_sk") {
++			rawKey, err := ioutil.ReadFile(path)
++			if err != nil {
++				return err
++			}
++
++			block, _ := pem.Decode(rawKey)
++			if block == nil {
++				return errors.Errorf("%s: wrong PEM encoding", path)
++			}
++			priv, err = csp.KeyImport(block.Bytes, &bccsp.ECDSAPrivateKeyImportOpts{Temporary: true})
++			if err != nil {
++				return err
++			}
++
++			s, err = signer.New(csp, priv)
++			if err != nil {
++				return err
++			}
++
++			return nil
++		}
++		return nil
++	}
++
++	err = filepath.Walk(keystorePath, walkFunc)
++	if err != nil {
++		return nil, nil, err
++	}
++
++	return priv, s, err
++}
++
++// GeneratePrivateKey creates a private key and stores it in keystorePath
++func GenerateTLSPrivateKey(keystorePath string) (bccsp.Key,
++	crypto.Signer, error) {
++
++	var err error
++	var priv bccsp.Key
++	var s crypto.Signer
++
++	opts := &factory.FactoryOpts{
++		ProviderName: "SW",
++		SwOpts: &factory.SwOpts{
++			HashFamily: "SHA2",
++			SecLevel:   256,
++
++			FileKeystore: &factory.FileKeystoreOpts{
++				KeyStorePath: keystorePath,
++			},
++		},
++	}
++	csp, err := factory.GetBCCSPFromOpts(opts)
++	if err == nil {
++		// generate a key
++		priv, err = csp.KeyGen(&bccsp.ECDSAP256KeyGenOpts{Temporary: false})
++		if err == nil {
++			// create a crypto.Signer
++			s, err = signer.New(csp, priv)
++		}
++	}
++	return priv, s, err
++}
++
+ // LoadPrivateKey loads a private key from file in keystorePath
+ func LoadPrivateKey(keystorePath string) (bccsp.Key, crypto.Signer, error) {
+ 	var err error
+diff --git a/common/tools/cryptogen/main.go b/common/tools/cryptogen/main.go
+index fc905d92a..308f0066c 100644
+--- a/common/tools/cryptogen/main.go
++++ b/common/tools/cryptogen/main.go
+@@ -306,7 +306,7 @@ func extendPeerOrg(orgSpec OrgSpec) {
+ 	tlscaDir := filepath.Join(orgDir, "tlsca")
+ 
+ 	signCA := getCA(caDir, orgSpec, orgSpec.CA.CommonName)
+-	tlsCA := getCA(tlscaDir, orgSpec, "tls"+orgSpec.CA.CommonName)
++	tlsCA := getTLSCA(tlscaDir, orgSpec, "tls"+orgSpec.CA.CommonName)
+ 
+ 	generateNodes(peersDir, orgSpec.Specs, signCA, tlsCA, msp.PEER, orgSpec.EnableNodeOUs)
+ 
+@@ -351,7 +351,7 @@ func extendOrdererOrg(orgSpec OrgSpec) {
+ 	}
+ 
+ 	signCA := getCA(caDir, orgSpec, orgSpec.CA.CommonName)
+-	tlsCA := getCA(tlscaDir, orgSpec, "tls"+orgSpec.CA.CommonName)
++	tlsCA := getTLSCA(tlscaDir, orgSpec, "tls"+orgSpec.CA.CommonName)
+ 
+ 	generateNodes(orderersDir, orgSpec.Specs, signCA, tlsCA, msp.ORDERER, false)
+ 
+@@ -520,7 +520,7 @@ func generatePeerOrg(baseDir string, orgSpec OrgSpec) {
+ 		os.Exit(1)
+ 	}
+ 	// generate TLS CA
+-	tlsCA, err := ca.NewCA(tlsCADir, orgName, "tls"+orgSpec.CA.CommonName, orgSpec.CA.Country, orgSpec.CA.Province, orgSpec.CA.Locality, orgSpec.CA.OrganizationalUnit, orgSpec.CA.StreetAddress, orgSpec.CA.PostalCode)
++	tlsCA, err := ca.NewTLSCA(tlsCADir, orgName, "tls"+orgSpec.CA.CommonName, orgSpec.CA.Country, orgSpec.CA.Province, orgSpec.CA.Locality, orgSpec.CA.OrganizationalUnit, orgSpec.CA.StreetAddress, orgSpec.CA.PostalCode)
+ 	if err != nil {
+ 		fmt.Printf("Error generating tlsCA for org %s:\n%v\n", orgName, err)
+ 		os.Exit(1)
+@@ -596,7 +596,7 @@ func copyAdminCert(usersDir, adminCertsDir, adminUserName string) error {
+ 
+ }
+ 
+-func generateNodes(baseDir string, nodes []NodeSpec, signCA *ca.CA, tlsCA *ca.CA, nodeType int, nodeOUs bool) {
++func generateNodes(baseDir string, nodes []NodeSpec, signCA *ca.CA, tlsCA *ca.TLSCA, nodeType int, nodeOUs bool) {
+ 
+ 	for _, node := range nodes {
+ 		nodeDir := filepath.Join(baseDir, node.CommonName)
+@@ -629,7 +629,7 @@ func generateOrdererOrg(baseDir string, orgSpec OrgSpec) {
+ 		os.Exit(1)
+ 	}
+ 	// generate TLS CA
+-	tlsCA, err := ca.NewCA(tlsCADir, orgName, "tls"+orgSpec.CA.CommonName, orgSpec.CA.Country, orgSpec.CA.Province, orgSpec.CA.Locality, orgSpec.CA.OrganizationalUnit, orgSpec.CA.StreetAddress, orgSpec.CA.PostalCode)
++	tlsCA, err := ca.NewTLSCA(tlsCADir, orgName, "tls"+orgSpec.CA.CommonName, orgSpec.CA.Country, orgSpec.CA.Province, orgSpec.CA.Locality, orgSpec.CA.OrganizationalUnit, orgSpec.CA.StreetAddress, orgSpec.CA.PostalCode)
+ 	if err != nil {
+ 		fmt.Printf("Error generating tlsCA for org %s:\n%v\n", orgName, err)
+ 		os.Exit(1)
+@@ -718,3 +718,24 @@ func getCA(caDir string, spec OrgSpec, name string) *ca.CA {
+ 		Sm2Key:             priv,
+ 	}
+ }
++
++func getTLSCA(caDir string, spec OrgSpec, name string) *ca.TLSCA {
++	_, signer, err := csp.LoadPrivateKey(caDir)
++	if err != nil {
++		panic(err)
++	}
++	cert, _ := ca.LoadCertificateECDSA(caDir)
++
++	return &ca.TLSCA{
++		Name: name,
++		Signer:             signer,
++		SignCert:           cert,
++		Country:            spec.CA.Country,
++		Province:           spec.CA.Province,
++		Locality:           spec.CA.Locality,
++		OrganizationalUnit: spec.CA.OrganizationalUnit,
++		StreetAddress:      spec.CA.StreetAddress,
++		PostalCode:         spec.CA.PostalCode,
++
++	}
++}
+diff --git a/common/tools/cryptogen/msp/generator.go b/common/tools/cryptogen/msp/generator.go
+index 4ec37aa4b..4e5bcb9f3 100644
+--- a/common/tools/cryptogen/msp/generator.go
++++ b/common/tools/cryptogen/msp/generator.go
+@@ -38,7 +38,7 @@ var nodeOUMap = map[int]string{
+ }
+ 
+ func GenerateLocalMSP(baseDir, name string, sans []string, signCA *ca.CA,
+-	tlsCA *ca.CA, nodeType int, nodeOUs bool) error {
++	tlsCA *ca.TLSCA, nodeType int, nodeOUs bool) error {
+ 
+ 	// create folder structure
+ 	mspDir := filepath.Join(baseDir, "msp")
+@@ -91,7 +91,7 @@ func GenerateLocalMSP(baseDir, name string, sans []string, signCA *ca.CA,
+ 		return err
+ 	}
+ 	// the TLS CA certificate goes into tlscacerts
+-	err = x509Export(filepath.Join(mspDir, "tlscacerts", x509Filename(tlsCA.Name)), tlsCA.SignSm2Cert)
++	err = x509TLSExport(filepath.Join(mspDir, "tlscacerts", x509Filename(tlsCA.Name)), tlsCA.SignCert)
+ 	if err != nil {
+ 		return err
+ 	}
+@@ -123,8 +123,8 @@ func GenerateLocalMSP(baseDir, name string, sans []string, signCA *ca.CA,
+ 		return err
+ 	}
+ 	// get public key
+-	//tlsPubKey, err := csp.GetECPublicKey(tlsPrivKey)
+-	tlsPubKey, err := csp.GetSM2PublicKey(tlsPrivKey)
++	tlsPubKey, err := csp.GetECPublicKey(tlsPrivKey)
++
+ 	if err != nil {
+ 		return err
+ 	}
+@@ -135,7 +135,7 @@ func GenerateLocalMSP(baseDir, name string, sans []string, signCA *ca.CA,
+ 	if err != nil {
+ 		return err
+ 	}
+-	err = x509Export(filepath.Join(tlsDir, "ca.crt"), tlsCA.SignSm2Cert)
++	err = x509TLSExport(filepath.Join(tlsDir, "ca.crt"), tlsCA.SignCert)
+ 	if err != nil {
+ 		return err
+ 	}
+@@ -159,7 +159,7 @@ func GenerateLocalMSP(baseDir, name string, sans []string, signCA *ca.CA,
+ 	return nil
+ }
+ 
+-func GenerateVerifyingMSP(baseDir string, signCA *ca.CA, tlsCA *ca.CA, nodeOUs bool) error {
++func GenerateVerifyingMSP(baseDir string, signCA *ca.CA, tlsCA *ca.TLSCA, nodeOUs bool) error {
+ 
+ 	// create folder structure and write artifacts to proper locations
+ 	err := createFolderStructure(baseDir, false)
+@@ -170,7 +170,7 @@ func GenerateVerifyingMSP(baseDir string, signCA *ca.CA, tlsCA *ca.CA, nodeOUs b
+ 			return err
+ 		}
+ 		// the TLS CA certificate goes into tlscacerts
+-		err = x509Export(filepath.Join(baseDir, "tlscacerts", x509Filename(tlsCA.Name)), tlsCA.SignSm2Cert)
++		err = x509TLSExport(filepath.Join(baseDir, "tlscacerts", x509Filename(tlsCA.Name)), tlsCA.SignCert)
+ 		if err != nil {
+ 			return err
+ 		}
+@@ -236,6 +236,10 @@ func x509Export(path string, cert *sm2.Certificate) error {
+ 	return pemExport(path, "CERTIFICATE", cert.Raw)
+ }
+ 
++func x509TLSExport(path string, cert *x509.Certificate) error {
++	return pemExport(path, "CERTIFICATE", cert.Raw)
++}
++
+ func keyExport(keystore, output string, key bccsp.Key) error {
+ 	id := hex.EncodeToString(key.SKI())
+ 
+diff --git a/vendor/github.com/tjfoc/gmsm/sm2/priv.pem b/vendor/github.com/tjfoc/gmsm/sm2/priv.pem
+new file mode 100644
+index 000000000..6a26dd70b
+--- /dev/null
++++ b/vendor/github.com/tjfoc/gmsm/sm2/priv.pem
+@@ -0,0 +1,6 @@
++-----BEGIN PRIVATE KEY-----
++MIGTAgEAMBMGByqGSM49AgEGCCqBHM9VAYItBHkwdwIBAQQg+g5Kwevg3sQbItfT
++f87mUdI67CNvya7INcEET1gIumGgCgYIKoEcz1UBgi2hRANCAARJQBiKqEs0rSPD
++0M4IOjtqBoqoGDFtIPf7avPTPjim0b9VRemh+PUm5Y3aofksVQVexZrE9aa+8mC2
++NY3n3sKj
++-----END PRIVATE KEY-----
+diff --git a/vendor/github.com/tjfoc/gmsm/sm2/pub.pem b/vendor/github.com/tjfoc/gmsm/sm2/pub.pem
+new file mode 100644
+index 000000000..538ad7111
+--- /dev/null
++++ b/vendor/github.com/tjfoc/gmsm/sm2/pub.pem
+@@ -0,0 +1,4 @@
++-----BEGIN PUBLIC KEY-----
++MFkwEwYHKoZIzj0CAQYIKoEcz1UBgi0DQgAESUAYiqhLNK0jw9DOCDo7agaKqBgx
++bSD3+2rz0z44ptG/VUXpofj1JuWN2qH5LFUFXsWaxPWmvvJgtjWN597Cow==
++-----END PUBLIC KEY-----
+diff --git a/vendor/github.com/tjfoc/gmsm/sm2/req.pem b/vendor/github.com/tjfoc/gmsm/sm2/req.pem
+new file mode 100644
+index 000000000..94dba052c
+--- /dev/null
++++ b/vendor/github.com/tjfoc/gmsm/sm2/req.pem
+@@ -0,0 +1,7 @@
++-----BEGIN CERTIFICATE REQUEST-----
++MIHmMIGMAgEAMCoxDTALBgNVBAoTBFRlc3QxGTAXBgNVBAMTEHRlc3QuZXhhbXBs
++ZS5jb20wWTATBgcqhkjOPQIBBggqgRzPVQGCLQNCAARJQBiKqEs0rSPD0M4IOjtq
++BoqoGDFtIPf7avPTPjim0b9VRemh+PUm5Y3aofksVQVexZrE9aa+8mC2NY3n3sKj
++oAAwCgYIKoEcz1UBg3UDSQAwRgIhAKY/ZOeQ9lgvEauGIfi56vJjD7Gs1dZhSFL/
++CTeU3J9cAiEA0YIi1Lx++OZcJa97cDJjWtXSffK53EPf7VGApZGyZkE=
++-----END CERTIFICATE REQUEST-----

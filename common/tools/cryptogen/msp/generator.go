@@ -38,7 +38,7 @@ var nodeOUMap = map[int]string{
 }
 
 func GenerateLocalMSP(baseDir, name string, sans []string, signCA *ca.CA,
-	tlsCA *ca.CA, nodeType int, nodeOUs bool) error {
+	tlsCA *ca.TLSCA, nodeType int, nodeOUs bool) error {
 
 	// create folder structure
 	mspDir := filepath.Join(baseDir, "msp")
@@ -91,7 +91,7 @@ func GenerateLocalMSP(baseDir, name string, sans []string, signCA *ca.CA,
 		return err
 	}
 	// the TLS CA certificate goes into tlscacerts
-	err = x509Export(filepath.Join(mspDir, "tlscacerts", x509Filename(tlsCA.Name)), tlsCA.SignSm2Cert)
+	err = x509TLSExport(filepath.Join(mspDir, "tlscacerts", x509Filename(tlsCA.Name)), tlsCA.SignCert)
 	if err != nil {
 		return err
 	}
@@ -123,8 +123,8 @@ func GenerateLocalMSP(baseDir, name string, sans []string, signCA *ca.CA,
 		return err
 	}
 	// get public key
-	//tlsPubKey, err := csp.GetECPublicKey(tlsPrivKey)
-	tlsPubKey, err := csp.GetSM2PublicKey(tlsPrivKey)
+	tlsPubKey, err := csp.GetECPublicKey(tlsPrivKey)
+
 	if err != nil {
 		return err
 	}
@@ -135,7 +135,7 @@ func GenerateLocalMSP(baseDir, name string, sans []string, signCA *ca.CA,
 	if err != nil {
 		return err
 	}
-	err = x509Export(filepath.Join(tlsDir, "ca.crt"), tlsCA.SignSm2Cert)
+	err = x509TLSExport(filepath.Join(tlsDir, "ca.crt"), tlsCA.SignCert)
 	if err != nil {
 		return err
 	}
@@ -159,7 +159,7 @@ func GenerateLocalMSP(baseDir, name string, sans []string, signCA *ca.CA,
 	return nil
 }
 
-func GenerateVerifyingMSP(baseDir string, signCA *ca.CA, tlsCA *ca.CA, nodeOUs bool) error {
+func GenerateVerifyingMSP(baseDir string, signCA *ca.CA, tlsCA *ca.TLSCA, nodeOUs bool) error {
 
 	// create folder structure and write artifacts to proper locations
 	err := createFolderStructure(baseDir, false)
@@ -170,7 +170,7 @@ func GenerateVerifyingMSP(baseDir string, signCA *ca.CA, tlsCA *ca.CA, nodeOUs b
 			return err
 		}
 		// the TLS CA certificate goes into tlscacerts
-		err = x509Export(filepath.Join(baseDir, "tlscacerts", x509Filename(tlsCA.Name)), tlsCA.SignSm2Cert)
+		err = x509TLSExport(filepath.Join(baseDir, "tlscacerts", x509Filename(tlsCA.Name)), tlsCA.SignCert)
 		if err != nil {
 			return err
 		}
@@ -233,6 +233,10 @@ func x509Filename(name string) string {
 }
 
 func x509Export(path string, cert *sm2.Certificate) error {
+	return pemExport(path, "CERTIFICATE", cert.Raw)
+}
+
+func x509TLSExport(path string, cert *x509.Certificate) error {
 	return pemExport(path, "CERTIFICATE", cert.Raw)
 }
 

@@ -43,6 +43,21 @@ type CA struct {
 	Sm2Key      bccsp.Key
 }
 
+type TLSCA struct {
+	Name               string
+	Country            string
+	Province           string
+	Locality           string
+	OrganizationalUnit string
+	StreetAddress      string
+	PostalCode         string
+	SignKey  *ecdsa.PrivateKey
+	Signer      crypto.Signer
+	SignCert    *x509.Certificate
+
+}
+
+
 // NewCA creates an instance of CA and saves the signing key pair in
 // baseDir/name
 func NewCA(baseDir, org, name, country, province, locality, orgUnit, streetAddress, postalCode string) (*CA, error) {
@@ -109,6 +124,64 @@ func NewCA(baseDir, org, name, country, province, locality, orgUnit, streetAddre
 	return ca, response
 }
 
+func NewTLSCA(baseDir, org, name, country, province, locality, orgUnit, streetAddress, postalCode string) (*TLSCA, error) {
+
+	var response error
+	var ca *TLSCA
+
+	err := os.MkdirAll(baseDir, 0755)
+	if err == nil {
+		priv, signer, err := csp.GenerateTLSPrivateKey(baseDir)
+		response = err
+		if err == nil {
+			// get public signing certificate
+			ecPubKey, err := csp.GetECPublicKey(priv)
+
+			response = err
+			if err == nil {
+				template := x509Template()
+				//this is a CA
+				template.IsCA = true
+				template.KeyUsage |= x509.KeyUsageDigitalSignature |
+					x509.KeyUsageKeyEncipherment | x509.KeyUsageCertSign |
+					x509.KeyUsageCRLSign
+				template.ExtKeyUsage = []x509.ExtKeyUsage{
+					x509.ExtKeyUsageClientAuth,
+					x509.ExtKeyUsageServerAuth,
+				}
+
+				//set the organization for the subject
+				subject := subjectTemplateAdditional(country, province, locality, orgUnit, streetAddress, postalCode)
+				subject.Organization = []string{org}
+				subject.CommonName = name
+
+				template.Subject = subject
+				template.SubjectKeyId = priv.SKI()
+
+				x509Cert, err := genCertificateECDSA(baseDir, name, &template, &template,
+					ecPubKey, signer)
+
+				response = err
+				if err == nil {
+					ca = &TLSCA{
+						Name: name,
+						Signer:             signer,
+						SignCert:           x509Cert,
+						Country:            country,
+						Province:           province,
+						Locality:           locality,
+						OrganizationalUnit: orgUnit,
+						StreetAddress:      streetAddress,
+						PostalCode:         postalCode,
+					}
+				}
+			}
+		}
+	}
+	return ca, response
+}
+
+
 // SignCertificate creates a signed certificate based on a built-in template
 // and saves it in baseDir/name
 func (ca *CA) SignCertificate(baseDir, name string, ous, sans []string, pub *sm2.PublicKey,
@@ -146,6 +219,40 @@ func (ca *CA) SignCertificate(baseDir, name string, ous, sans []string, pub *sm2
 		return nil, err
 	}
 
+	return cert, nil
+}
+
+func (ca *TLSCA) SignCertificate(baseDir, name string, ous, sans []string, pub *ecdsa.PublicKey,
+	ku x509.KeyUsage, eku []x509.ExtKeyUsage) (*x509.Certificate, error) {
+
+	template := x509Template()
+	template.KeyUsage = ku
+	template.ExtKeyUsage = eku
+
+	//set the organization for the subject
+	subject := subjectTemplateAdditional(ca.Country, ca.Province, ca.Locality, ca.OrganizationalUnit, ca.StreetAddress, ca.PostalCode)
+	subject.CommonName = name
+
+	subject.OrganizationalUnit = append(subject.OrganizationalUnit, ous...)
+
+	template.Subject = subject
+	for _, san := range sans {
+		// try to parse as an IP address first
+		ip := net.ParseIP(san)
+		if ip != nil {
+			template.IPAddresses = append(template.IPAddresses, ip)
+		} else {
+			template.DNSNames = append(template.DNSNames, san)
+		}
+	}
+
+	template.PublicKey = pub
+	cert, err := genCertificateECDSA(baseDir, name, &template, ca.SignCert,
+		pub, ca.Signer)
+
+	if err != nil {
+		return nil, err
+	}
 	return cert, nil
 }
 

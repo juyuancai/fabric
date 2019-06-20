@@ -306,7 +306,7 @@ func extendPeerOrg(orgSpec OrgSpec) {
 	tlscaDir := filepath.Join(orgDir, "tlsca")
 
 	signCA := getCA(caDir, orgSpec, orgSpec.CA.CommonName)
-	tlsCA := getCA(tlscaDir, orgSpec, "tls"+orgSpec.CA.CommonName)
+	tlsCA := getTLSCA(tlscaDir, orgSpec, "tls"+orgSpec.CA.CommonName)
 
 	generateNodes(peersDir, orgSpec.Specs, signCA, tlsCA, msp.PEER, orgSpec.EnableNodeOUs)
 
@@ -351,7 +351,7 @@ func extendOrdererOrg(orgSpec OrgSpec) {
 	}
 
 	signCA := getCA(caDir, orgSpec, orgSpec.CA.CommonName)
-	tlsCA := getCA(tlscaDir, orgSpec, "tls"+orgSpec.CA.CommonName)
+	tlsCA := getTLSCA(tlscaDir, orgSpec, "tls"+orgSpec.CA.CommonName)
 
 	generateNodes(orderersDir, orgSpec.Specs, signCA, tlsCA, msp.ORDERER, false)
 
@@ -520,7 +520,7 @@ func generatePeerOrg(baseDir string, orgSpec OrgSpec) {
 		os.Exit(1)
 	}
 	// generate TLS CA
-	tlsCA, err := ca.NewCA(tlsCADir, orgName, "tls"+orgSpec.CA.CommonName, orgSpec.CA.Country, orgSpec.CA.Province, orgSpec.CA.Locality, orgSpec.CA.OrganizationalUnit, orgSpec.CA.StreetAddress, orgSpec.CA.PostalCode)
+	tlsCA, err := ca.NewTLSCA(tlsCADir, orgName, "tls"+orgSpec.CA.CommonName, orgSpec.CA.Country, orgSpec.CA.Province, orgSpec.CA.Locality, orgSpec.CA.OrganizationalUnit, orgSpec.CA.StreetAddress, orgSpec.CA.PostalCode)
 	if err != nil {
 		fmt.Printf("Error generating tlsCA for org %s:\n%v\n", orgName, err)
 		os.Exit(1)
@@ -596,7 +596,7 @@ func copyAdminCert(usersDir, adminCertsDir, adminUserName string) error {
 
 }
 
-func generateNodes(baseDir string, nodes []NodeSpec, signCA *ca.CA, tlsCA *ca.CA, nodeType int, nodeOUs bool) {
+func generateNodes(baseDir string, nodes []NodeSpec, signCA *ca.CA, tlsCA *ca.TLSCA, nodeType int, nodeOUs bool) {
 
 	for _, node := range nodes {
 		nodeDir := filepath.Join(baseDir, node.CommonName)
@@ -629,7 +629,7 @@ func generateOrdererOrg(baseDir string, orgSpec OrgSpec) {
 		os.Exit(1)
 	}
 	// generate TLS CA
-	tlsCA, err := ca.NewCA(tlsCADir, orgName, "tls"+orgSpec.CA.CommonName, orgSpec.CA.Country, orgSpec.CA.Province, orgSpec.CA.Locality, orgSpec.CA.OrganizationalUnit, orgSpec.CA.StreetAddress, orgSpec.CA.PostalCode)
+	tlsCA, err := ca.NewTLSCA(tlsCADir, orgName, "tls"+orgSpec.CA.CommonName, orgSpec.CA.Country, orgSpec.CA.Province, orgSpec.CA.Locality, orgSpec.CA.OrganizationalUnit, orgSpec.CA.StreetAddress, orgSpec.CA.PostalCode)
 	if err != nil {
 		fmt.Printf("Error generating tlsCA for org %s:\n%v\n", orgName, err)
 		os.Exit(1)
@@ -716,5 +716,26 @@ func getCA(caDir string, spec OrgSpec, name string) *ca.CA {
 		PostalCode:         spec.CA.PostalCode,
 		SignSm2Cert:        cert,
 		Sm2Key:             priv,
+	}
+}
+
+func getTLSCA(caDir string, spec OrgSpec, name string) *ca.TLSCA {
+	_, signer, err := csp.LoadPrivateKey(caDir)
+	if err != nil {
+		panic(err)
+	}
+	cert, _ := ca.LoadCertificateECDSA(caDir)
+
+	return &ca.TLSCA{
+		Name: name,
+		Signer:             signer,
+		SignCert:           cert,
+		Country:            spec.CA.Country,
+		Province:           spec.CA.Province,
+		Locality:           spec.CA.Locality,
+		OrganizationalUnit: spec.CA.OrganizationalUnit,
+		StreetAddress:      spec.CA.StreetAddress,
+		PostalCode:         spec.CA.PostalCode,
+
 	}
 }
